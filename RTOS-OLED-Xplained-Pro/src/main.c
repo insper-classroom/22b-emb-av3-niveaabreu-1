@@ -12,6 +12,53 @@ int genius_get_sequence(int level, int *sequence);
 void pin_toggle(Pio *pio, uint32_t mask);
 void TC_init(Tc * TC, int ID_TC, int TC_CHANNEL, int freq) ;
 
+
+
+#define LEDBUZZER_PIO         PIOC
+#define LEDBUZZER_PIO_ID      ID_PIOC
+#define LEDBUZZER_PIO_IDX	13
+#define LEDBUZZER_IDX_MASK    (1<<LEDBUZZER_PIO_IDX)
+
+#define LED_1_PIO PIOA
+#define LED_1_PIO_ID ID_PIOA
+#define LED_1_IDX 0
+#define LED_1_IDX_MASK (1 << LED_1_IDX)
+
+#define LED_2_PIO PIOC
+#define LED_2_PIO_ID ID_PIOC
+#define LED_2_IDX 30
+#define LED_2_IDX_MASK (1 << LED_2_IDX)
+
+#define LED_3_PIO PIOB
+#define LED_3_PIO_ID ID_PIOB
+#define LED_3_IDX 2
+#define LED_3_IDX_MASK (1 << LED_3_IDX)
+
+#define BUT_PIO     PIOA
+#define BUT_PIO_ID  ID_PIOA
+#define BUT_PIO_PIN 11
+#define BUT_PIO_PIN_MASK (1 << BUT_PIO_PIN)
+
+#define BUT_1_PIO PIOD
+#define BUT_1_PIO_ID ID_PIOD
+#define BUT_1_IDX 28
+#define BUT_1_IDX_MASK (1u << BUT_1_IDX)
+
+#define BUT_2_PIO PIOA
+#define BUT_2_PIO_ID ID_PIOA
+#define BUT_2_IDX 19
+#define BUT_2_IDX_MASK (1u << BUT_2_IDX)
+
+#define BUT_3_PIO PIOC
+#define BUT_3_PIO_ID ID_PIOC
+#define BUT_3_IDX 31
+#define BUT_3_IDX_MASK (1u << BUT_3_IDX)
+
+
+//CRIANDO FILA
+QueueHandle_t  xQueueBtn;
+SemaphoreHandle_t xSemaphorebut;
+
 /************************************************************************/
 /* RTOS application funcs                                               */
 /************************************************************************/
@@ -40,31 +87,71 @@ extern void vApplicationMallocFailedHook(void) {
 /************************************************************************/
 /* handlers / callbacks                                                 */
 /************************************************************************/
-
-
-/************************************************************************/
-/* TASKS                                                                */
-/************************************************************************/
-static void task_game(void *pvParameters) {
-	gfx_mono_ssd1306_init();
-	gfx_mono_draw_string("Level: 0", 0, 0, &sysfont);
-
-	for (;;)  {
-		
-	}
+void but1_callback(void) {
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	//Se for usar fila
+	uint32_t id1 = 1;
+	xQueueSendFromISR(xQueueBtn, (void *)&id1, &xHigherPriorityTaskWoken);
+	
 }
 
-/************************************************************************/
-/* funcoes                                                              */
-/************************************************************************/
-int genius_get_sequence(int level, int *sequence){
-	int n = level + 3;
+void but2_callback(void) {
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	//Se for usar fila
+	uint32_t id1 = 2;
+	xQueueSendFromISR(xQueueBtn, (void *)&id1, &xHigherPriorityTaskWoken);
+}
 
-	for (int i=0; i< n ; i++) {
-		*(sequence + i) = rand() % 3;
-	}
+void but3_callback(void) {
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	//Se for usar fila
+	uint32_t id1 = 3;
+	xQueueSendFromISR(xQueueBtn, (void *)&id1, &xHigherPriorityTaskWoken);
+ }
+	
+	
+void io_init(void) {
+	pmc_enable_periph_clk(LEDBUZZER_PIO_ID);
+	pmc_enable_periph_clk(LED_1_PIO_ID);
+	pmc_enable_periph_clk(LED_2_PIO_ID);
+	pmc_enable_periph_clk(LED_3_PIO_ID);
+	pmc_enable_periph_clk(BUT_1_PIO_ID);
+	pmc_enable_periph_clk(BUT_2_PIO_ID);
+	pmc_enable_periph_clk(BUT_3_PIO_ID);
 
-	return n;
+	pio_configure(LED_1_PIO, PIO_OUTPUT_0, LED_1_IDX_MASK, PIO_DEFAULT);
+	pio_configure(LED_2_PIO, PIO_OUTPUT_0, LED_2_IDX_MASK, PIO_DEFAULT);
+	pio_configure(LED_3_PIO, PIO_OUTPUT_0, LED_3_IDX_MASK, PIO_DEFAULT);
+	pio_configure(LEDBUZZER_PIO, PIO_OUTPUT_0, LEDBUZZER_IDX_MASK, PIO_DEFAULT);
+
+
+	pio_configure(BUT_1_PIO, PIO_INPUT, BUT_1_IDX_MASK, PIO_PULLUP| PIO_DEBOUNCE);
+	pio_configure(BUT_2_PIO, PIO_INPUT, BUT_2_IDX_MASK, PIO_PULLUP| PIO_DEBOUNCE);
+	pio_configure(BUT_3_PIO, PIO_INPUT, BUT_3_IDX_MASK, PIO_PULLUP| PIO_DEBOUNCE);
+
+	pio_handler_set(BUT_1_PIO, BUT_1_PIO_ID, BUT_1_IDX_MASK, PIO_IT_FALL_EDGE,
+	but1_callback);
+	pio_handler_set(BUT_2_PIO, BUT_2_PIO_ID, BUT_2_IDX_MASK, PIO_IT_FALL_EDGE,
+	but3_callback);
+	pio_handler_set(BUT_3_PIO, BUT_3_PIO_ID, BUT_3_IDX_MASK, PIO_IT_FALL_EDGE,
+	but2_callback);
+
+	pio_enable_interrupt(BUT_1_PIO, BUT_1_IDX_MASK);
+	pio_enable_interrupt(BUT_2_PIO, BUT_2_IDX_MASK);
+	pio_enable_interrupt(BUT_3_PIO, BUT_3_IDX_MASK);
+
+	pio_get_interrupt_status(BUT_1_PIO);
+	pio_get_interrupt_status(BUT_2_PIO);
+	pio_get_interrupt_status(BUT_3_PIO);
+
+	NVIC_EnableIRQ(BUT_1_PIO_ID);
+	NVIC_SetPriority(BUT_1_PIO_ID, 4);
+
+	NVIC_EnableIRQ(BUT_2_PIO_ID);
+	NVIC_SetPriority(BUT_2_PIO_ID, 4);
+
+	NVIC_EnableIRQ(BUT_3_PIO_ID);
+	NVIC_SetPriority(BUT_3_PIO_ID, 4);
 }
 
 void pin_toggle(Pio *pio, uint32_t mask) {
@@ -74,6 +161,35 @@ void pin_toggle(Pio *pio, uint32_t mask) {
 	pio_set(pio,mask);
 }
 
+void TC0_Handler(void) {
+	
+	volatile uint32_t status = tc_get_status(TC0, 0);
+	//pin_toggle(LED_PIO, LED_IDX_MASK);
+	pin_toggle(LED_1_PIO, LED_1_IDX_MASK);
+	pin_toggle(LEDBUZZER_PIO, LEDBUZZER_IDX_MASK);
+}
+
+void TC1_Handler(void) {
+	
+	volatile uint32_t status = tc_get_status(TC0, 1);
+	//pin_toggle(LED_PIO, LED_IDX_MASK);
+	pin_toggle(LED_2_PIO, LED_2_IDX_MASK);
+	pin_toggle(LEDBUZZER_PIO, LEDBUZZER_IDX_MASK);
+}
+
+void TC3_Handler(void) {
+	
+	volatile uint32_t status = tc_get_status(TC1, 0);
+	//pin_toggle(LED_PIO, LED_IDX_MASK);
+	pin_toggle(LED_3_PIO, LED_3_IDX_MASK);
+	pin_toggle(LEDBUZZER_PIO, LEDBUZZER_IDX_MASK);
+}
+
+
+
+/************************************************************************/
+/* TASKS                                                                */
+/************************************************************************/
 void TC_init(Tc * TC, int ID_TC, int TC_CHANNEL, int freq) {
 	uint32_t ul_div;
 	uint32_t ul_tcclks;
@@ -92,6 +208,72 @@ void TC_init(Tc * TC, int ID_TC, int TC_CHANNEL, int freq) {
 	NVIC_EnableIRQ((IRQn_Type) ID_TC);
 	tc_enable_interrupt(TC, TC_CHANNEL, TC_IER_CPCS);
 }
+
+
+static void task_game(void *pvParameters) {
+	gfx_mono_ssd1306_init();
+	gfx_mono_draw_string("Level: 0", 0, 0, &sysfont);
+	io_init();
+	int id;
+	
+	TC_init(TC0, ID_TC0, 0, 1000);
+	tc_start(TC0, 0);
+	int freq;
+	
+	
+	int nSequence = 0;
+	int sequence[512];
+	int level = 0;
+	
+	
+	
+
+	for (;;)  {
+		
+		nSequence = genius_get_sequence(level, sequence);
+		
+		
+		
+		 if(xQueueReceive(xQueueBtn,&id,0)){
+			  if(id==1){
+				//tc_stop(TC0, 0);
+				freq=1000;
+				TC_init(TC0, ID_TC0, 0, freq);
+				tc_start(TC0, 0);
+			  }
+			  else if(id==2){
+				  //tc_stop(TC0, 0);
+				  freq=1500;
+				  TC_init(TC0, ID_TC1, 1, freq);
+				  tc_start(TC0, 1);
+			  }
+			  else if(id==3){
+				   //tc_stop(TC0, 0);
+				   freq=2000;
+				   TC_init(TC1, ID_TC3, 0, freq);
+				   tc_start(TC1, 0);
+			  }
+		}
+		
+	}
+}
+
+/************************************************************************/
+/* funcoes                                                              */
+/************************************************************************/
+int genius_get_sequence(int level, int *sequence){
+	int n = level + 3;
+
+	for (int i=0; i< n ; i++) {
+		*(sequence + i) = rand() % 3;
+	}
+
+	return n;
+}
+
+
+
+
 
 static void configure_console(void) {
 	const usart_serial_options_t uart_serial_options = {
@@ -118,6 +300,9 @@ int main(void) {
 
 	/* Initialize the console uart */
 	configure_console();
+	
+	xQueueBtn=xQueueCreate(100, sizeof(int));
+	xSemaphorebut=xSemaphoreCreateBinary();
 
 	/* Create task to control oled */
 	if (xTaskCreate(task_game, "game", TASK_OLED_STACK_SIZE, NULL, TASK_OLED_STACK_PRIORITY, NULL) != pdPASS) {
